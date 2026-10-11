@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ezeiza Terminal Carga - Control Operativo v22</title>
+  <style>
+    :root {
+      --bg-main: #030712;
+      --panel-bg: #0f172a;
+      --panel-border: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --card-bg: #030712;
+      --input-bg: #030712;
+    }
+
+    body.light-mode {
+      --bg-main: #f1f5f9;
+      --panel-bg: #ffffff;
+      --panel-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --card-bg: #f8fafc;
+      --input-bg: #ffffff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; transition: background-color 0.2s, color 0.2s; }
+    body { background-color: var(--bg-main); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; }
+
+    header { background-color: var(--panel-bg); border-bottom: 1px solid var(--panel-border); position: sticky; top: 0; z-index: 50; }
+    .max-w-7xl { max-width: 1350px; margin: 0 auto; padding: 12px 16px; }
+
+    .btn { padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-blue { background: #2563eb; color: white; } .btn-blue:hover { background: #1d4ed8; }
+    .btn-emerald { background: #059669; color: white; } .btn-emerald:hover { background: #047857; }
+    .btn-amber { background: #d97706; color: white; } .btn-amber:hover { background: #b45309; }
+    .btn-rose { background: #e11d48; color: white; } .btn-rose:hover { background: #be123c; }
+    .btn-slate { background: var(--card-bg); color: var(--text-main); border: 1px solid var(--panel-border); }
+
+    input, select { background: var(--input-bg); color: var(--text-main); border: 1px solid var(--panel-border); padding: 8px 12px; border-radius: 8px; font-size: 12px; outline: none; width: 100%; }
+
+    .flow-line { stroke-dasharray: 8; animation: dash 1.5s linear infinite; }
+    @keyframes dash { to { stroke-dashoffset: -16; } }
+
+    .pallet-card { cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; user-select: none; }
+    .pallet-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 25; }
+
+    .modal-overlay { position: fixed; inset: 0; background: rgba(3, 7, 18, 0.85); backdrop-filter: blur(4px); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .modal-card { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 16px; width: 100%; max-width: 520px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); color: var(--text-main); }
+    .hidden { display: none !important; }
+
+    .map-box { position: absolute; border-radius: 12px; padding: 10px; z-index: 10; backdrop-filter: blur(4px); display: flex; flex-direction: column; justify-content: space-between; }
+    .map-box.draggable { cursor: grab; }
+    .map-box.draggable:active { cursor: grabbing; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="max-w-7xl" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="background: #2563eb; padding: 10px; border-radius: 12px; color: white; font-weight: bold;">✈️</div>
+        <div>
+          <h1 style="font-size: 16px; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+            Ezeiza Terminal Carga <span style="font-size: 10px; background: rgba(37,99,235,0.15); color: #60a5fa; border: 1px solid rgba(37,99,235,0.3); padding: 2px 8px; border-radius: 9999px;">E-Commerce & Courier</span>
+          </h1>
+          <p style="font-size: 11px; color: var(--text-muted);">Control Operativo de Pallets & Gestión de Flujo en Vivo</p>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <button id="themeToggleBtn" onclick="toggleTheme()" class="btn btn-slate">🌙 Modo Oscuro</button>
+        <button id="adminToggleBtn" onclick="promptAdminMode()" class="btn btn-slate">🛡️ <span id="adminToggleText">Modo Operador</span></button>
+        <button id="changePassBtn" onclick="openChangePassModal()" class="btn btn-amber hidden admin-control">⚙️ Cambiar Clave</button>
+        <button id="predioBtn" onclick="openPredioModal()" class="btn btn-blue hidden admin-control">🚛 Ingreso Camión a Predio</button>
+        <button onclick="exportToExcel()" class="btn btn-emerald">📊 Exportar Excel</button>
+        <button onclick="openIngresoGuiasModal()" class="btn btn-blue">📄 Carga Masiva</button>
+        <button onclick="openIngresoGuiasModal()" class="btn btn-emerald">➕ Nuevo Pallet</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- BUSCADOR CON DETALLE COMPLETO -->
+  <section style="background: var(--panel-bg); border-bottom: 1px solid var(--panel-border); padding: 10px 16px;">
+    <div class="max-w-7xl" style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;">
+        <div style="position: relative; flex: 1; min-width: 240px; max-width: 450px;">
+          <input type="text" id="searchInput" oninput="applyFilters()" placeholder="🔍 Buscar Guía (ej: 044-45230651) o ID Pallet...">
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <select id="consigneeFilter" onchange="applyFilters()" style="width: 180px;">
+            <option value="ALL">Todos Consignatarios</option>
+            <option value="Andreani">Andreani (Cinta Azul 🟦)</option>
+            <option value="Ocasa">Ocasa (Cinta Verde 🟩)</option>
+            <option value="FT">FT Logistics (Naranja 🟧)</option>
+            <option value="Mail Express">Mail Express (Cinta Violeta 🟪)</option>
+            <option value="Urbano">Urbano (Cinta Roja 🟥)</option>
+          </select>
+          <select id="statusFilter" onchange="applyFilters()" style="width: 160px;">
+            <option value="ALL">Todos los Estados</option>
+            <option value="VUELO">1. Galpón Vuelo</option>
+            <option value="VERIFICANDO">2. Box E-Commerce</option>
+            <option value="JAULA">3. Jaula Aduana</option>
+            <option value="PLATAFORMA">Plataformas "P"</option>
+            <option value="DESPACHADO">4. Bocas de Carga</option>
+          </select>
+        </div>
+      </div>
+      <div id="searchDetailResults" class="hidden" style="background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 8px; padding: 8px 12px; font-size: 11px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;"></div>
+    </div>
+  </section>
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <main class="max-w-7xl" style="width: 100%; flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 16px;">
+
+    <!-- DASHBOARD KPI -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+      <div style="background: var(--panel-bg); padding: 12px; border-radius: 12px; border: 1px solid rgba(59,130,246,0.3); display: flex; align-items: center; justify-content: space-between;">
+        <div><span style="font-size: 10px; font-weight: bold; color: #60a5fa; text-transform: uppercase;">1. Galpón Vuelo</span><p style="font-size: 18px; font-weight: 800; color: #60a5fa;" id="kpiFlight">0 pallets</p></div>
+        <div style="background: rgba(59,130,246,0.1); color: #60a5fa; padding: 8px; border-radius: 8px; font-weight: bold;">📦</div>
+      </div>
+      <div style="background: var(--panel-bg); padding: 12px; border-radius: 12px; border: 1px solid rgba(168,85,247,0.3); display: flex; align-items: center; justify-content: space-between;">
+        <div><span style="font-size: 10px; font-weight: bold; color: #c084fc; text-transform: uppercase;">2. Boxes E-Commerce</span><p style="font-size: 18px; font-weight: 800; color: #c084fc;" id="kpiBoxes">0 pallets</p></div>
+        <div style="background: rgba(168,85,247,0.1); color: #c084fc; padding: 8px; border-radius: 8px; font-weight: bold;">🗂️</div>
+      </div>
+      <div style="background: var(--panel-bg); padding: 12px; border-radius: 12px; border: 1px solid rgba(16,185,129,0.3); display: flex; align-items: center; justify-content: space-between;">
+        <div><span style="font-size: 10px; font-weight: bold; color: #34d399; text-transform: uppercase;">3. Jaula Aduana</span><p style="font-size: 18px; font-weight: 800; color: #34d399;" id="kpiCage">0 / 12</p></div>
+        <div style="background: rgba(16,185,129,0.1); color: #34d399; padding: 8px; border-radius: 8px; font-weight: bold;">🛡️</div>
+      </div>
+      <div style="background: var(--panel-bg); padding: 12px; border-radius: 12px; border: 1px solid rgba(244,63,94,0.3); display: flex; align-items: center; justify-content: space-between;">
+        <div><span style="font-size: 10px; font-weight: bold; color: #fb7185; text-transform: uppercase;" id="kpiCamionesFecha">Camiones Cargados</span><p style="font-size: 18px; font-weight: 800; color: #fb7185;" id="kpiDispatchedTrucks">0 camiones</p></div>
+        <div style="background: rgba(244,63,94,0.1); color: #fb7185; padding: 8px; border-radius: 8px; font-weight: bold;">🚛</div>
+      </div>
+    </div>
+
+    <!-- MAPA OPERATIVO EN PLANTA -->
+    <div style="background: var(--panel-bg); border-radius: 16px; border: 1px solid var(--panel-border); padding: 16px; position: relative;">
+      
+      <!-- ENCABEZADO Y GRAFICOS CIRCULARES DE CAPACIDAD POR GALPÓN -->
+      <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--panel-border); padding-bottom: 10px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <h2 style="font-weight: bold; font-size: 15px;">🗺️ Mapa Operativo en Planta (Ezeiza) & Capacidad por Galpón</h2>
+          <div id="adminModeBanner" class="hidden" style="font-size: 11px; background: rgba(217,119,6,0.2); color: #fbbf24; border: 1px solid rgba(217,119,6,0.4); padding: 2px 10px; border-radius: 9999px; font-weight: bold;">
+            ⚠️ MODO ADMIN ACTIVADO (Flujo de líneas de Vuelo ➔ Galpones ➔ Bocas)
+          </div>
+        </div>
+
+        <!-- INDICADORES CIRCULARES DE CAPACIDAD -->
+        <div id="capacityChartsContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px;">
+          <!-- Generado Dinámicamente -->
+        </div>
+      </div>
+
+      <div id="mapCanvas" style="position: relative; width: 100%; height: 620px; background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 12px; overflow: hidden; padding: 12px;">
+        
+        <svg id="dynamicSvgLines" style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;"></svg>
+
+        <!-- 1. GALPÓN VUELO -->
+        <div id="zoneVuelo" class="map-box draggable" style="top: 12px; left: 12px; width: 260px; height: 195px; background: rgba(30,58,138,0.25); border: 2px solid #3b82f6;" onmousedown="initDrag(event, 'zoneVuelo')">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(59,130,246,0.3); padding-bottom: 4px; margin-bottom: 6px;">
+            <span style="font-size: 11px; font-weight: bold; color: #93c5fd;">🔵 1. Galpón Vuelo</span>
+            <button onclick="openAddZoneModal('VUELO')" class="admin-control hidden btn btn-blue" style="font-size: 9px; padding: 2px 6px;">+ Sección</button>
+          </div>
+          <div id="galponVueloContainer" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; overflow-y: auto; flex: 1;"></div>
+          <div class="admin-control hidden" style="display: flex; gap: 4px; margin-top: 4px; font-size: 9px; align-items: center;">
+            <span>Ancho:</span><input type="range" min="200" max="400" value="260" oninput="resizeBox('zoneVuelo', 'width', this.value)">
+            <span>Alto:</span><input type="range" min="150" max="300" value="195" oninput="resizeBox('zoneVuelo', 'height', this.value)">
+          </div>
+        </div>
+
+        <!-- 2. BOXES E-COMMERCE -->
+        <div id="zoneBoxes" class="map-box draggable" style="top: 140px; left: 290px; width: 260px; height: 210px; background: rgba(88,28,135,0.25); border: 2px solid #a855f7;" onmousedown="initDrag(event, 'zoneBoxes')">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(168,85,247,0.3); padding-bottom: 4px; margin-bottom: 6px;">
+            <span style="font-size: 11px; font-weight: bold; color: #d8b4fe;">🟣 2. Boxes E-Commerce</span>
+            <div style="display: flex; gap: 4px; align-items: center;">
+              <button onclick="openAddZoneModal('BOXES')" class="admin-control hidden btn btn-amber" style="font-size: 9px; padding: 2px 6px;">+ Box</button>
+              <span style="font-size: 10px; background: rgba(168,85,247,0.2); color: #d8b4fe; font-weight: bold; padding: 2px 6px; border-radius: 4px;" id="cntBoxes">0 pls</span>
+            </div>
+          </div>
+          <div id="gridBoxes" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; overflow-y: auto; flex: 1;"></div>
+          <div class="admin-control hidden" style="display: flex; gap: 4px; margin-top: 4px; font-size: 9px; align-items: center;">
+            <span>Ancho:</span><input type="range" min="220" max="450" value="260" oninput="resizeBox('zoneBoxes', 'width', this.value)">
+            <span>Alto:</span><input type="range" min="160" max="350" value="210" oninput="resizeBox('zoneBoxes', 'height', this.value)">
+          </div>
+        </div>
+
+        <!-- 3. JAULA TEMPORAL -->
+        <div id="zoneCage" class="map-box draggable" style="top: 330px; left: 12px; width: 260px; height: 195px; background: rgba(6,78,59,0.25); border: 2px solid #10b981;" onmousedown="initDrag(event, 'zoneCage')">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(16,185,129,0.3); padding-bottom: 4px; margin-bottom: 6px;">
+            <span style="font-size: 11px; font-weight: bold; color: #6ee7b7;">🟢 3. Jaula Temporal Aduana</span>
+            <div style="display: flex; gap: 4px; align-items: center;">
+              <button onclick="openAddZoneModal('CAGE')" class="admin-control hidden btn btn-emerald" style="font-size: 9px; padding: 2px 6px;">+ Jaula</button>
+              <span style="font-size: 10px; background: rgba(16,185,129,0.2); color: #6ee7b7; font-weight: bold; padding: 2px 6px; border-radius: 4px;" id="cntCage">0/12</span>
+            </div>
+          </div>
+          <div id="gridCage" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; overflow-y: auto; flex: 1;"></div>
+          <div class="admin-control hidden" style="display: flex; gap: 4px; margin-top: 4px; font-size: 9px; align-items: center;">
+            <span>Ancho:</span><input type="range" min="200" max="400" value="260" oninput="resizeBox('zoneCage', 'width', this.value)">
+            <span>Alto:</span><input type="range" min="150" max="300" value="195" oninput="resizeBox('zoneCage', 'height', this.value)">
+          </div>
+        </div>
+
+        <!-- PLATAFORMA "P" -->
+        <div id="zonePlatforms" class="map-box draggable" style="top: 380px; left: 290px; width: 260px; height: 165px; background: rgba(14,116,144,0.25); border: 2px solid #38bdf8;" onmousedown="initDrag(event, 'zonePlatforms')">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(56,189,248,0.3); padding-bottom: 4px; margin-bottom: 6px;">
+            <span style="font-size: 11px; font-weight: bold; color: #7dd3fc;">🅿️ Plataformas Externas ("P")</span>
+            <button onclick="openAddZoneModal('PLATFORM')" class="admin-control hidden btn btn-blue" style="font-size: 9px; padding: 2px 6px;">+ P</button>
+          </div>
+          <div id="mapPlatformsContainer" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; overflow-y: auto; flex: 1;"></div>
+          <div class="admin-control hidden" style="display: flex; gap: 4px; margin-top: 4px; font-size: 9px; align-items: center;">
+            <span>Ancho:</span><input type="range" min="200" max="400" value="260" oninput="resizeBox('zonePlatforms', 'width', this.value)">
+            <span>Alto:</span><input type="range" min="130" max="280" value="165" oninput="resizeBox('zonePlatforms', 'height', this.value)">
+          </div>
+        </div>
+
+        <!-- 4. BOCAS DE CARGA Y CAMIONES EN PREDIO -->
+        <div id="zoneDocks" class="map-box draggable" style="top: 12px; left: 570px; width: 270px; height: 535px; background: rgba(159,18,57,0.25); border: 2px solid #f43f5e;" onmousedown="initDrag(event, 'zoneDocks')">
+          <div style="border-bottom: 1px solid rgba(244,63,94,0.3); padding-bottom: 4px;">
+            <span style="font-size: 11px; font-weight: bold; color: #fda4af;">🔴 4. Bocas & Camiones en Predio</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; padding-top: 4px;">
+            
+            <div style="background: var(--card-bg); border: 1px solid rgba(244,63,94,0.3); border-radius: 8px; padding: 6px;">
+              <span style="font-size: 10px; font-weight: bold; display: block; margin-bottom: 4px;" id="titleBocaCourier">Boca Courier [Sin Camión]</span>
+              <div id="containerCamionesBocaCourier" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px;"></div>
+              <div id="dockCourier" style="display: flex; gap: 4px; padding: 4px 0; min-height: 20px; flex-wrap: wrap;"></div>
+            </div>
+
+            <div style="background: var(--card-bg); border: 1px solid rgba(244,63,94,0.3); border-radius: 8px; padding: 6px;">
+              <span style="font-size: 10px; font-weight: bold; display: block; margin-bottom: 4px;" id="titleRampa4">Rampa 4 [Sin Camión]</span>
+              <div id="containerCamionesRampa4" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px;"></div>
+              <div id="dockRampa" style="display: flex; gap: 4px; padding: 4px 0; min-height: 20px; flex-wrap: wrap;"></div>
+            </div>
+
+          </div>
+          <div class="admin-control hidden" style="display: flex; gap: 4px; margin-top: 4px; font-size: 9px; align-items: center;">
+            <span>Ancho:</span><input type="range" min="200" max="400" value="270" oninput="resizeBox('zoneDocks', 'width', this.value)">
+            <span>Alto:</span><input type="range" min="300" max="600" value="535" oninput="resizeBox('zoneDocks', 'height', this.value)">
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- CÓDIGO DE CINTAS CONSIGNATARIOS -->
+    <div style="background: var(--panel-bg); border-radius: 16px; border: 1px solid var(--panel-border); padding: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid var(--panel-border); padding-bottom: 6px;">
+        <h3 style="font-weight: bold; font-size: 13px;">🎨 Código de Cintas Consignatarios</h3>
+        <button onclick="openAddConsigneeModal()" class="btn btn-blue" style="font-size: 9px; padding: 2px 8px;">+ Consignatario</button>
+      </div>
+      <div id="consigneeTapeGuide" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;"></div>
+    </div>
+
+    <!-- LISTA DE TAREAS -->
+    <div style="background: var(--panel-bg); border-radius: 16px; border: 1px solid var(--panel-border); padding: 16px;">
+      <h2 style="font-weight: bold; font-size: 15px; margin-bottom: 12px;">🧭 Lista de Tareas para Autoelevadores (Actualización en Vivo)</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+        <div style="background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 12px; padding: 12px;">
+          <h3 style="font-size: 12px; color: #60a5fa; font-weight: bold; margin-bottom: 8px;">🔄 Cuadro 1: Traslados Internos</h3>
+          <div id="internalTaskList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+        <div style="background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 12px; padding: 12px;">
+          <h3 style="font-size: 12px; color: #fb7185; font-weight: bold; margin-bottom: 8px;">🚛 Cuadro 2: Operaciones de Carga de Camiones</h3>
+          <div id="truckTaskList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL: AGREGAR ZONA -->
+  <div id="addZoneModal" class="modal-overlay hidden">
+    <div class="modal-card" style="max-width: 360px;">
+      <div style="padding: 14px; border-bottom: 1px solid var(--panel-border);"><h3 style="font-weight: bold;" id="addZoneTitle">Agregar Ubicación</h3></div>
+      <form onsubmit="handleCreateZone(event)" style="padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+        <input type="text" id="inputNewZoneName" placeholder="Ej: Box-01 o J-13 o P-05" required>
+        <div style="display: flex; justify-content: flex-end; gap: 6px;">
+          <button type="button" onclick="closeAddZoneModal()" class="btn btn-slate">Cancelar</button>
+          <button type="submit" class="btn btn-amber">Crear</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: AGREGAR/EDITAR CONSIGNATARIO -->
+  <div id="consigneeModal" class="modal-overlay hidden">
+    <div class="modal-card" style="max-width: 380px;">
+      <div style="padding: 14px; border-bottom: 1px solid var(--panel-border);"><h3 style="font-weight: bold;" id="consigneeModalTitle">🎨 Agregar/Editar Consignatario</h3></div>
+      <form onsubmit="handleSaveConsignee(event)" style="padding: 14px; display: flex; flex-direction: column; gap: 10px; font-size: 12px;">
+        <input type="hidden" id="editingConsigneeOriginalName" value="">
+        <div><label>Nombre Consignatario</label><input type="text" id="inputNewConsignee" placeholder="Ej: DHL Express" required></div>
+        <div><label>Descripción de Cinta</label><input type="text" id="inputNewTapeText" placeholder="Ej: Cinta Celeste / Amarilla" required></div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div><label>Color Principal (Base)</label><input type="color" id="inputNewTapeColor" value="#06b6d4" style="height: 36px; padding: 2px;"></div>
+          <div><label>Color Secundario (Detalle)</label><input type="color" id="inputNewTapeColor2" value="#f59e0b" style="height: 36px; padding: 2px;"></div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px;">
+          <button type="button" onclick="closeConsigneeModal()" class="btn btn-slate">Cancelar</button>
+          <button type="submit" class="btn btn-emerald">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: SELECCIÓN DE POSICIÓN ESPECÍFICA -->
+  <div id="selectPositionModal" class="modal-overlay hidden" style="z-index: 120;">
+    <div class="modal-card" style="max-width: 380px;">
+      <div style="padding: 14px; border-bottom: 1px solid var(--panel-border);"><h3 style="font-weight: bold;" id="selectPositionModalTitle">Seleccionar Posición Específica</h3></div>
+      <div style="padding: 16px; display: flex; flex-direction: column; gap: 10px; font-size: 12px;">
+        <label>Elija la posición o sector exacto de destino:</label>
+        <select id="selectSubzoneTarget"></select>
+      </div>
+      <div style="padding: 12px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--panel-border);">
+        <button onclick="closeSelectPositionModal()" class="btn btn-slate">Cancelar</button>
+        <button onclick="confirmPositionSelection()" class="btn btn-emerald">Generar Orden</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DETALLE PALLET -->
+  <div id="palletModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div style="padding: 16px; border-bottom: 1px solid var(--panel-border); display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-weight: bold;" id="modalPalletTitle">Detalle de Pallet</h3>
+        <button onclick="closePalletModal()" style="background:none; border:none; color:gray; cursor:pointer;">✕</button>
+      </div>
+      <div style="padding: 16px; display: flex; flex-direction: column; gap: 10px; font-size: 12px;">
+        <div id="modalPhotoContainer" class="hidden" style="width: 100%; height: 120px; background: #000; border-radius: 8px; overflow: hidden;">
+          <img id="modalImgPreview" src="" style="width: 100%; height: 100%; object-fit: cover;">
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+          <div style="background: var(--card-bg); padding: 8px; border-radius: 6px; border: 1px solid var(--panel-border);"><b>Consignatario:</b> <span id="modalConsignee">-</span></div>
+          <div style="background: var(--card-bg); padding: 8px; border-radius: 6px; border: 1px solid var(--panel-border);"><b>Guía / Bultos:</b> <span id="modalHawbBultos">-</span></div>
+          <div style="background: var(--card-bg); padding: 8px; border-radius: 6px; border: 1px solid var(--panel-border); grid-column: span 2;"><b>Embalaje:</b> <span id="modalEmbalaje">-</span></div>
+        </div>
+        <div style="background: var(--card-bg); padding: 8px; border-radius: 6px; border: 1px solid var(--panel-border);">
+          <b>Ubicación Actual:</b> <span id="modalLocation" style="color: #fbbf24; font-weight: bold;">-</span>
+        </div>
+        <div style="border-top: 1px solid var(--panel-border); padding-top: 10px; margin-top: 4px;">
+          <label style="font-weight: bold; display: block; margin-bottom: 6px;">Crear Orden de Traslado:</label>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;" id="modalRelocateButtons"></div>
+        </div>
+      </div>
+      <div style="padding: 12px; display: flex; justify-content: flex-end; border-top: 1px solid var(--panel-border);">
+        <button onclick="closePalletModal()" class="btn btn-slate">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: REGISTRAR CAMIÓN EN PREDIO -->
+  <div id="predioModal" class="modal-overlay hidden">
+    <div class="modal-card" style="max-width: 440px;">
+      <div style="padding: 16px; border-bottom: 1px solid var(--panel-border); display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-weight: bold;">🚛 Registrar Camión en Predio (Multiguía)</h3>
+        <button onclick="closePredioModal()" style="background:none; border:none; color:gray; cursor:pointer;">✕</button>
+      </div>
+      <form onsubmit="handleRegistrarCamionPredio(event)" style="padding: 16px; display: flex; flex-direction: column; gap: 10px; font-size: 12px;">
+        <div><label>Boca de Carga Destino</label>
+          <select id="predioBoca" required>
+            <option value="Boca Courier">Boca Courier</option>
+            <option value="Rampa 4">Rampa 4</option>
+          </select>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+          <div><label>Patente Tractor (Cabina)</label><input type="text" id="predioTractor" placeholder="Ej: AA2K8494" required></div>
+          <div><label>Patente Semirremolque</label><input type="text" id="predioSemi" placeholder="Ej: ADA5454" required></div>
+        </div>
+        <div><label>Empresa / Transportista</label><input type="text" id="predioEmpresa" placeholder="Ej: Andreani SA" required></div>
+        <div>
+          <label style="display: flex; justify-content: space-between;"><span>Seleccione Guías / Pallets a Cargar</span> <span style="font-size: 10px; color: var(--text-muted);">(Podrá marcar varias)</span></label>
+          <div id="predioGuiaCheckboxesContainer" style="max-height: 140px; overflow-y: auto; background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 4px;"></div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px;">
+          <button type="button" onclick="closePredioModal()" class="btn btn-slate">Cancelar</button>
+          <button type="submit" class="btn btn-blue">Registrar Camión</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: SELECCIONAR CAMIÓN REGISTRADO AL ENVIAR A BOCA -->
+  <div id="selectCamionModal" class="modal-overlay hidden" style="z-index: 110;">
+    <div class="modal-card" style="max-width: 380px;">
+      <div style="padding: 16px; border-bottom: 1px solid var(--panel-border);"><h3 style="font-weight: bold;" id="selectCamionTitle">Seleccionar Camión en Boca</h3></div>
+      <div style="padding: 16px; display: flex; flex-direction: column; gap: 10px; font-size: 12px;">
+        <label>Elija el camión posicionado:</label>
+        <select id="selectCamionDisponibles"></select>
+        <div id="validacionGuiaInfo" style="background: var(--card-bg); padding: 8px; border-radius: 6px; border: 1px solid var(--panel-border); font-size: 11px; margin-top: 6px;"></div>
+      </div>
+      <div style="padding: 12px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--panel-border);">
+        <button onclick="closeSelectCamionModal()" class="btn btn-slate">Cancelar</button>
+        <button onclick="confirmAsignarPalletCamion()" class="btn btn-emerald">Vincular Carga</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CARGA MASIVA -->
+  <div id="ingresoGuiasModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div style="padding: 16px; border-bottom: 1px solid var(--panel-border); display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-weight: bold;">📄 Carga Masiva / Ingreso de Pallets</h3>
+        <button onclick="closeIngresoGuiasModal()" style="background:none; border:none; color:gray; cursor:pointer;">✕</button>
+      </div>
+      <form id="guiasForm" onsubmit="handleRegistrarGuia(event)" style="padding: 16px; display: flex; flex-direction: column; gap: 10px; font-size: 12px;">
+        <div><label>ID Pallet</label><input type="text" id="inputPalletId" placeholder="Ej: PAL-201" required></div>
+        <div><label>Guía Aérea (044-XXXXXXXX)</label><input type="text" id="inputHawb" placeholder="Ej: 044-45230651" required></div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+          <div><label>Consignatario</label>
+            <select id="selectConsignatario" required></select>
+          </div>
+          <div><label>Cant. Bultos</label><input type="number" id="inputBultos" value="110" min="1" required></div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+          <div><label>Cant. Pallets</label><input type="number" id="inputCantPallets" value="1" min="1" required></div>
+          <div><label>Embalaje / Cinta</label><input type="text" id="inputEmbalaje" placeholder="Cinta Azul / Film"></div>
+        </div>
+        <div><label>Foto URL (Opcional)</label><input type="text" id="inputFoto" placeholder="https://..."></div>
+        <div><label>Ubicación Inicial Galpón Vuelo</label>
+          <select id="selectUbicacionInicial"></select>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px;">
+          <button type="button" onclick="closeIngresoGuiasModal()" class="btn btn-slate">Cancelar</button>
+          <button type="submit" class="btn btn-blue">Registrar Pallet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRMAR TAREA -->
+  <div id="taskConfirmModal" class="modal-overlay hidden">
+    <div class="modal-card" style="max-width: 380px;">
+      <div style="padding: 16px; border-bottom: 1px solid var(--panel-border);"><h3 style="font-weight: bold;">⚠️ Confirmar Operación</h3></div>
+      <div style="padding: 16px; font-size: 13px;"><p id="taskConfirmMessage">¿Confirmar esta tarea?</p></div>
+      <div style="padding: 12px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--panel-border);">
+        <button onclick="closeTaskConfirmModal()" class="btn btn-slate">Cancelar</button>
+        <button id="btnExecuteTask" class="btn btn-emerald">Sí, Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: LOGIN ADMIN -->
+  <div id="adminAuthModal" class="modal-overlay hidden">
+    <div class="modal-card" style="max-width: 340px;">
+      <div style="padding: 16px; border-bottom: 1px solid var(--panel-border);"><h3 style="font-weight: bold;">🔑 Acceso Administrador</h3></div>
+      <form onsubmit="verifyAdminPassword(event)" style="padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+        <label style="font-size: 12px;">Ingrese Contraseña de Seguridad:</label>
+        <input type="password" id="inputAdminPass" placeholder="Ingrese clave..." required>
+        <p id="adminPassError" style="color: #f43f5e; font-size: 11px;" class="hidden">Contraseña incorrecta.</p>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
+          <button type="button" onclick="closeAdminAuthModal()" class="btn btn-slate">Cancelar</button>
+          <button type="submit" class="btn btn-amber">Ingresar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CAMBIAR CLAVE -->
+  <div id="changePassModal" class="modal-overlay hidden">
+    <div class="modal-card" style="max-width: 340px;">
+      <div style="padding: 16px; border-bottom: 1px solid var(--panel-border);"><h3 style="font-weight: bold;">⚙️ Cambiar Contraseña Admin</h3></div>
+      <form onsubmit="handleChangePassword(event)" style="padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+        <input type="password" id="currentPassInput" placeholder="Contraseña Actual" required>
+        <input type="password" id="newPassInput" placeholder="Nueva Contraseña" required>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
+          <button type="button" onclick="closeChangePassModal()" class="btn btn-slate">Cancelar</button>
+          <button type="submit" class="btn btn-emerald">Guardar Nueva Clave</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    var CON_TAPES = {
+      'Andreani': { tape: '#3b82f6', tape2: '#1d4ed8', text: 'Cinta Azul 🟦' },
+      'Ocasa': { tape: '#10b981', tape2: '#047857', text: 'Cinta Verde 🟩' },
+      'FT': { tape: '#f59e0b', tape2: '#b45309', text: 'Cinta Naranja 🟧' },
+      'Mail Express': { tape: '#a855f7', tape2: '#7e22ce', text: 'Cinta Violeta 🟪' },
+      'Urbano': { tape: '#f43f5e', tape2: '#be123c', text: 'Cinta Roja 🟥' }
+    };
+
+    var isDarkMode = true;
+    var isAdminMode = false;
+    var adminPassword = 'admin123';
+    var activeZoneCat = 'VUELO';
+    var selectedPallet = null;
+    var currentSelectedPalletForTruck = null;
+    var pendingRelocateStatus = '';
+    var pendingCategoryTarget = '';
+
+    var boxesSubzones = ['Box-01', 'Box-02', 'Box-03', 'Box-04'];
+    var cageSubzones = ['J-01', 'J-02', 'J-03', 'J-04'];
+    var galponSubzones = ['Stage Directa', 'Stage Courier', 'Línea A1', 'Línea A2'];
+    var platformsP = ['P-01', 'P-02', 'P-03', 'P-04'];
+
+    var predioCamionesList = {
+      'Boca Courier': [],
+      'Rampa 4': []
+    };
+
+    var historialCamionesCargados = [];
+
+    var pallets = [
+      { id: 'PAL-101', hawb: '044-45230651', consignee: 'Andreani', bultos: 110, cantPallets: 1, embalaje: 'Cinta Azul', status: 'VUELO', ubicacion: 'Stage Directa' },
+      { id: 'PAL-102', hawb: '044-88120492', consignee: 'Ocasa', bultos: 85, cantPallets: 1, embalaje: 'Cinta Verde', status: 'VERIFICANDO', boxName: 'Box-03' },
+      { id: 'PAL-103', hawb: '044-77341092', consignee: 'FT', bultos: 95, cantPallets: 1, embalaje: 'Cinta Naranja', status: 'JAULA', cageName: 'J-02' }
+    ];
+
+    var tasks = [
+      { id: 1, palletId: 'PAL-101', hawb: '044-45230651', bultos: 110, cantPallets: 1, consignee: 'Andreani', type: 'INTERNAL', from: 'Stage Directa', to: 'Box-04', targetStatus: 'VERIFICANDO', targetBoxName: 'Box-04' }
+    ];
+
+    var draggingBox = null;
+    var dragOffsetX = 0, dragOffsetY = 0;
+
+    function initDrag(e, boxId) {
+      if (!isAdminMode) return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
+      draggingBox = document.getElementById(boxId);
+      var rect = draggingBox.getBoundingClientRect();
+      var canvasRect = document.getElementById('mapCanvas').getBoundingClientRect();
+      dragOffsetX = e.clientX - rect.left;
+      dragOffsetY = e.clientY - rect.top;
+      document.addEventListener('mousemove', onDrag);
+      document.addEventListener('mouseup', stopDrag);
+    }
+
+    function onDrag(e) {
+      if (!draggingBox) return;
+      var canvasRect = document.getElementById('mapCanvas').getBoundingClientRect();
+      var newX = e.clientX - canvasRect.left - dragOffsetX;
+      var newY = e.clientY - canvasRect.top - dragOffsetY;
+      draggingBox.style.left = newX + 'px';
+      draggingBox.style.top = newY + 'px';
+      updateDynamicLines();
+    }
+
+    function stopDrag() {
+      draggingBox = null;
+      document.removeEventListener('mousemove', onDrag);
+      document.removeEventListener('mouseup', stopDrag);
+    }
+
+    function updateDynamicLines() {
+      var svg = document.getElementById('dynamicSvgLines');
+      var vEl = document.getElementById('zoneVuelo');
+      var bEl = document.getElementById('zoneBoxes');
+      var cEl = document.getElementById('zoneCage');
+      var pEl = document.getElementById('zonePlatforms');
+      var dEl = document.getElementById('zoneDocks');
+      if (!svg || !vEl || !bEl || !cEl || !pEl || !dEl) return;
+
+      var canvasRect = document.getElementById('mapCanvas').getBoundingClientRect();
+      var vR = vEl.getBoundingClientRect();
+      var bR = bEl.getBoundingClientRect();
+      var cR = cEl.getBoundingClientRect();
+      var pR = pEl.getBoundingClientRect();
+      var dR = dEl.getBoundingClientRect();
+
+      var vX = vR.right - canvasRect.left;
+      var vY = vR.top + vR.height / 2 - canvasRect.top;
+
+      var bX = bR.left + bR.width / 2 - canvasRect.left;
+      var bY = bR.top + bR.height / 2 - canvasRect.top;
+
+      var cX = cR.left + cR.width / 2 - canvasRect.left;
+      var cY = cR.top + cR.height / 2 - canvasRect.top;
+
+      var pX = pR.left + pR.width / 2 - canvasRect.left;
+      var pY = pR.top + pR.height / 2 - canvasRect.top;
+
+      var dX = dR.left - canvasRect.left;
+      var dY = dR.top + dR.height / 2 - canvasRect.top;
+
+      svg.innerHTML = `
+        <path d="M ${vX},${vY} L ${bX},${bY}" fill="none" stroke="#f59e0b" stroke-width="2.5" class="flow-line"/>
+        <path d="M ${vX},${vY} L ${cX},${cY}" fill="none" stroke="#f59e0b" stroke-width="2.5" class="flow-line"/>
+        <path d="M ${vX},${vY} L ${pX},${pY}" fill="none" stroke="#f59e0b" stroke-width="2.5" class="flow-line"/>
+
+        <path d="M ${bR.right - canvasRect.left},${bR.top + bR.height / 2 - canvasRect.top} L ${dX},${dY}" fill="none" stroke="#f43f5e" stroke-width="2.5" class="flow-line"/>
+        <path d="M ${cR.right - canvasRect.left},${cR.top + cR.height / 2 - canvasRect.top} L ${dX},${dY}" fill="none" stroke="#f43f5e" stroke-width="2.5" class="flow-line"/>
+        <path d="M ${pR.right - canvasRect.left},${pR.top + pR.height / 2 - canvasRect.top} L ${dX},${dY}" fill="none" stroke="#f43f5e" stroke-width="2.5" class="flow-line"/>
+      `;
+    }
+
+    window.onload = function() {
+      document.getElementById('kpiCamionesFecha').innerText = "Camiones Cargados";
+      renderAll();
+      setTimeout(updateDynamicLines, 50);
+    };
+
+    function toggleTheme() {
+      isDarkMode = !isDarkMode;
+      document.body.classList.toggle('light-mode', !isDarkMode);
+      document.getElementById('themeToggleBtn').innerText = isDarkMode ? "🌙 Modo Oscuro" : "☀️ Modo Claro";
+    }
+
+    function promptAdminMode() {
+      if (isAdminMode) { isAdminMode = false; applyAdminState(); }
+      else { document.getElementById('adminAuthModal').classList.remove('hidden'); }
+    }
+    function closeAdminAuthModal() { document.getElementById('adminAuthModal').classList.add('hidden'); }
+    function verifyAdminPassword(e) {
+      e.preventDefault();
+      if (document.getElementById('inputAdminPass').value === adminPassword) {
+        isAdminMode = true; closeAdminAuthModal(); applyAdminState();
+        document.getElementById('inputAdminPass').value = '';
+      } else { document.getElementById('adminPassError').classList.remove('hidden'); }
+    }
+
+    function openChangePassModal() { document.getElementById('changePassModal').classList.remove('hidden'); }
+    function closeChangePassModal() { document.getElementById('changePassModal').classList.add('hidden'); }
+    function handleChangePassword(e) {
+      e.preventDefault();
+      var curr = document.getElementById('currentPassInput').value;
+      var newP = document.getElementById('newPassInput').value;
+      if (curr === adminPassword) { adminPassword = newP; alert('¡Contraseña actualizada!'); closeChangePassModal(); }
+      else { alert('Contraseña actual incorrecta.'); }
+    }
+
+    function openPredioModal() {
+      var container = document.getElementById('predioGuiaCheckboxesContainer');
+      var disponibles = pallets.filter(function(p) { return p.status !== 'FINALIZADO' && !p.status.startsWith('DESPACHADO'); });
+      if (container) {
+        container.innerHTML = disponibles.map(function(p) {
+          return '<label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" name="guiaPredioCheck" value="' + p.id + '"> <b>' + p.id + '</b> (Guía: ' + p.hawb + ' - ' + p.consignee + ')</label>';
+        }).join('') || '<i style="color:gray;">No hay guías disponibles</i>';
+      }
+      document.getElementById('predioModal').classList.remove('hidden');
+    }
+    function closePredioModal() { document.getElementById('predioModal').classList.add('hidden'); }
+
+    function handleRegistrarCamionPredio(e) {
+      e.preventDefault();
+      var boca = document.getElementById('predioBoca').value;
+      var tractor = document.getElementById('predioTractor').value.trim();
+      var semi = document.getElementById('predioSemi').value.trim();
+      var empresa = document.getElementById('predioEmpresa').value.trim();
+
+      var checkboxes = document.querySelectorAll('input[name="guiaPredioCheck"]:checked');
+      var guiasSeleccionadas = [];
+      checkboxes.forEach(function(cb) { guiasSeleccionadas.push(cb.value); });
+
+      if (guiasSeleccionadas.length === 0) {
+        alert('⚠️ Debe seleccionar al menos una guía / pallet para este camión.');
+        return;
+      }
+
+      predioCamionesList[boca].push({
+        tractor: tractor,
+        semi: semi,
+        empresa: empresa,
+        guiasAsignadas: guiasSeleccionadas,
+        fecha: new Date().toLocaleDateString()
+      });
+
+      closePredioModal();
+      document.getElementById('predioTractor').value = '';
+      document.getElementById('predioSemi').value = '';
+      document.getElementById('predioEmpresa').value = '';
+      renderAll();
+      alert('🚛 ¡Camión [' + tractor + '] registrado con ' + guiasSeleccionadas.length + ' guía(s) en ' + boca + '!');
+    }
+
+    function applyAdminState() {
+      var btn = document.getElementById('adminToggleBtn');
+      var txt = document.getElementById('adminToggleText');
+      var banner = document.getElementById('adminModeBanner');
+      var controls = document.querySelectorAll('.admin-control');
+      if (isAdminMode) {
+        btn.className = "btn btn-amber"; txt.innerText = "Modo Admin (Activo)";
+        banner.classList.remove('hidden'); controls.forEach(function(c) { c.classList.remove('hidden'); });
+      } else {
+        btn.className = "btn btn-slate"; txt.innerText = "Modo Operador";
+        banner.classList.add('hidden'); controls.forEach(function(c) { c.classList.add('hidden'); });
+      }
+      renderAll();
+    }
+
+    function resizeBox(boxId, dimension, val) {
+      var el = document.getElementById(boxId);
+      if (el) {
+        if (dimension === 'width') el.style.width = val + 'px';
+        if (dimension === 'height') el.style.height = val + 'px';
+        updateDynamicLines();
+      }
+    }
+
+    function renderAll() {
+      renderKPIs();
+      renderCapacityCharts();
+      renderGalponVuelo();
+      renderBoxesGrid();
+      renderCageGrid();
+      renderPlatformsMap();
+      renderDocks();
+      renderConsigneeTapeGuide();
+      renderTasks();
+      updateDropdowns();
+      setTimeout(updateDynamicLines, 10);
+    }
+
+    function updateDropdowns() {
+      var selCon = document.getElementById('selectConsignatario');
+      if (selCon) {
+        selCon.innerHTML = Object.keys(CON_TAPES).map(function(c) { return '<option value="' + c + '">' + c + ' (' + CON_TAPES[c].text + ')</option>'; }).join('');
+      }
+      var selUbi = document.getElementById('selectUbicacionInicial');
+      if (selUbi) {
+        selUbi.innerHTML = galponSubzones.map(function(s) { return '<option value="' + s + '">' + s + '</option>'; }).join('');
+      }
+    }
+
+    function renderKPIs() {
+      document.getElementById('kpiFlight').innerText = pallets.filter(function(p) { return p.status === 'VUELO'; }).length + ' pallets';
+      document.getElementById('kpiBoxes').innerText = pallets.filter(function(p) { return p.status === 'VERIFICANDO'; }).length + ' pallets';
+      document.getElementById('kpiCage').innerText = pallets.filter(function(p) { return p.status === 'JAULA'; }).length + ' / ' + cageSubzones.length;
+      document.getElementById('kpiDispatchedTrucks').innerText = historialCamionesCargados.length + ' camiones';
+    }
+
+    function renderCapacityCharts() {
+      var container = document.getElementById('capacityChartsContainer');
+      if (!container) return;
+
+      // 1. Vuelo
+      var totalVuelo = galponSubzones.length;
+      var ocupadosVuelo = galponSubzones.filter(function(sec) {
+        return pallets.some(function(p) { return p.status === 'VUELO' && p.ubicacion === sec; });
+      }).length;
+      var pctVuelo = totalVuelo > 0 ? Math.round((ocupadosVuelo / totalVuelo) * 100) : 0;
+
+      // 2. Boxes E-Commerce
+      var totalBoxes = boxesSubzones.length;
+      var ocupadosBoxes = boxesSubzones.filter(function(box) {
+        return pallets.some(function(p) { return p.status === 'VERIFICANDO' && p.boxName === box; });
+      }).length;
+      var pctBoxes = totalBoxes > 0 ? Math.round((ocupadosBoxes / totalBoxes) * 100) : 0;
+
+      // 3. Jaula Aduana
+      var totalCage = cageSubzones.length;
+      var ocupadosCage = cageSubzones.filter(function(cage) {
+        return pallets.some(function(p) { return p.status === 'JAULA' && p.cageName === cage; });
+      }).length;
+      var pctCage = totalCage > 0 ? Math.round((ocupadosCage / totalCage) * 100) : 0;
+
+      // 4. Plataformas P
+      var totalPlat = platformsP.length;
+      var ocupadosPlat = platformsP.filter(function(plat) {
+        return pallets.some(function(p) { return p.status === 'PLATAFORMA' && p.platName === plat; });
+      }).length;
+      var pctPlat = totalPlat > 0 ? Math.round((ocupadosPlat / totalPlat) * 100) : 0;
+
+      container.innerHTML = 
+        createCircularCard('Galpón Vuelo', pctVuelo, ocupadosVuelo, totalVuelo, '#3b82f6') +
+        createCircularCard('Boxes E-Commerce', pctBoxes, ocupadosBoxes, totalBoxes, '#a855f7') +
+        createCircularCard('Jaula Aduana', pctCage, ocupadosCage, totalCage, '#10b981') +
+        createCircularCard('Plataformas P', pctPlat, ocupadosPlat, totalPlat, '#38bdf8');
+    }
+
+    function createCircularCard(title, pct, ocupados, total, color) {
+      var radius = 22;
+      var circumference = 2 * Math.PI * radius;
+      var strokeDashoffset = circumference - (pct / 100) * circumference;
+
+      return '<div style="background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 10px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;">' +
+        '<div>' +
+          '<span style="font-size: 10px; font-weight: bold; color: var(--text-muted); text-transform: uppercase;">' + title + '</span>' +
+          '<p style="font-size: 14px; font-weight: 800; color: ' + color + '; margin-top: 2px;">' + ocupados + ' / ' + total + ' <span style="font-size: 10px; font-weight: normal; color: var(--text-muted);">ocupados</span></p>' +
+        '</div>' +
+        '<div style="position: relative; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">' +
+          '<svg width="50" height="50" style="transform: rotate(-90deg);">' +
+            '<circle cx="25" cy="25" r="' + radius + '" stroke="var(--panel-border)" stroke-width="5" fill="none"></circle>' +
+            '<circle cx="25" cy="25" r="' + radius + '" stroke="' + color + '" stroke-width="5" stroke-dasharray="' + circumference + '" stroke-dashoffset="' + strokeDashoffset + '" stroke-linecap="round" fill="none"></circle>' +
+          '</svg>' +
+          '<span style="position: absolute; font-size: 10px; font-weight: bold; color: var(--text-main);">' + pct + '%</span>' +
+        '</div>' +
+      '</div>';
+    }
+
+    function getConsigneeStyle(consignee) {
+      var t = CON_TAPES[consignee] || { tape: '#2563eb', tape2: '#1d4ed8' };
+      var t2 = t.tape2 || t.tape;
+      return 'background: linear-gradient(135deg, ' + t.tape + ' 0%, ' + t2 + ' 100%); color: white; border: 1px solid ' + t2 + ';';
+    }
+
+    function applyFilters() {
+      var search = document.getElementById('searchInput').value.trim().toLowerCase();
+      var detailContainer = document.getElementById('searchDetailResults');
+
+      if (search.length > 0) {
+        var found = pallets.find(function(p) { return p.id.toLowerCase().indexOf(search) !== -1 || p.hawb.toLowerCase().indexOf(search) !== -1; });
+        if (found) {
+          var tape = CON_TAPES[found.consignee] || { tape: '#fff', text: '-' };
+          detailContainer.innerHTML = '<span><b>ID:</b> ' + found.id + '</span><span><b>Guía:</b> ' + found.hawb + '</span><span><b>Consignatario:</b> <span style="color:' + tape.tape + '; font-weight:bold;">' + found.consignee + '</span></span><span><b>Bultos:</b> ' + found.bultos + '</span><span><b>Pallets:</b> ' + (found.cantPallets || 1) + '</span><span><b>Estado:</b> ' + found.status + '</span>';
+          detailContainer.classList.remove('hidden');
+        } else {
+          detailContainer.innerHTML = '<span style="color:gray;">No se encontró resultado para "' + search + '".</span>';
+          detailContainer.classList.remove('hidden');
+        }
+      } else {
+        detailContainer.classList.add('hidden');
+      }
+      renderAll();
+    }
+
+    function passesFilter(p) {
+      var search = document.getElementById('searchInput').value.trim().toLowerCase();
+      var con = document.getElementById('consigneeFilter').value;
+      var status = document.getElementById('statusFilter').value;
+      var matchesSearch = p.id.toLowerCase().indexOf(search) !== -1 || p.hawb.toLowerCase().indexOf(search) !== -1;
+      var matchesCon = con === 'ALL' || p.consignee === con;
+      var matchesStatus = status === 'ALL' || p.status.indexOf(status) === 0;
+      return matchesSearch && matchesCon && matchesStatus;
+    }
+
+    function renderGalponVuelo() {
+      var container = document.getElementById('galponVueloContainer');
+      container.innerHTML = galponSubzones.map(function(sec) {
+        var items = pallets.filter(function(p) { return p.status === 'VUELO' && p.ubicacion === sec && passesFilter(p); });
+        return '<div style="background: var(--card-bg); border: 1px solid rgba(59,130,246,0.3); border-radius: 6px; padding: 4px; font-size: 10px; display:flex; flex-direction:column; justify-content:space-between; min-height:45px; position:relative;"><div style="display: flex; justify-content: space-between;"><b>' + sec + '</b>' + (isAdminMode ? '<button onclick="deleteSubzone(\'' + sec + '\')" style="color:#f43f5e; background:none; border:none; cursor:pointer;">✕</button>' : '') + '</div><div style="display:flex; flex-wrap:wrap; gap:3px;">' + (items.map(function(p) { return '<span onclick="openPalletModal(\'' + p.id + '\')" class="pallet-card" style="' + getConsigneeStyle(p.consignee) + ' padding:1px 4px; border-radius:3px; font-size:8px; font-weight:bold;">' + p.id + '</span>'; }).join('') || '<i style="color:gray; font-size:8px;">Libre</i>') + '</div></div>';
+      }).join('');
+    }
+
+    function renderBoxesGrid() {
+      var container = document.getElementById('gridBoxes');
+      var active = pallets.filter(function(p) { return p.status === 'VERIFICANDO'; });
+      document.getElementById('cntBoxes').innerText = active.length + ' pls';
+      container.innerHTML = boxesSubzones.map(function(boxName) {
+        var itemsInBox = active.filter(function(p) { return p.boxName === boxName && passesFilter(p); });
+        return '<div style="background: var(--card-bg); border: 1px solid rgba(168,85,247,0.3); border-radius: 6px; padding: 4px; font-size: 10px; display:flex; flex-direction:column; justify-content:space-between; min-height:45px; position:relative;"><div style="display: flex; justify-content: space-between;"><b style="color:#d8b4fe;">' + boxName + '</b>' + (isAdminMode ? '<button onclick="deleteBoxSubzone(\'' + boxName + '\')" style="color:#f43f5e; background:none; border:none; cursor:pointer;">✕</button>' : '') + '</div><div style="display:flex; flex-wrap:wrap; gap:2px;">' + (itemsInBox.length > 0 ? itemsInBox.map(function(item) { return '<span onclick="openPalletModal(\'' + item.id + '\')" class="pallet-card" style="' + getConsigneeStyle(item.consignee) + ' padding:1px 3px; border-radius:2px; font-size:7px; font-weight:bold;">' + item.id + '</span>'; }).join('') : '<i style="color:gray; font-size:7px;">Libre</i>') + '</div></div>';
+      }).join('');
+    }
+
+    function renderCageGrid() {
+      var container = document.getElementById('gridCage');
+      var active = pallets.filter(function(p) { return p.status === 'JAULA'; });
+      document.getElementById('cntCage').innerText = active.length + '/' + cageSubzones.length;
+      container.innerHTML = cageSubzones.map(function(cageName) {
+        var item = active.find(function(p) { return p.cageName === cageName && passesFilter(p); });
+        return '<div style="background: var(--card-bg); border: 1px solid rgba(16,185,129,0.3); border-radius: 6px; padding: 4px; font-size: 10px; display:flex; flex-direction:column; justify-content:space-between; min-height:45px; position:relative;"><div style="display: flex; justify-content: space-between;"><b style="color:#6ee7b7;">' + cageName + '</b>' + (isAdminMode ? '<button onclick="deleteCageSubzone(\'' + cageName + '\')" style="color:#f43f5e; background:none; border:none; cursor:pointer;">✕</button>' : '') + '</div><div style="display:flex; flex-wrap:wrap; gap:2px;">' + (item ? '<span onclick="openPalletModal(\'' + item.id + '\')" class="pallet-card" style="' + getConsigneeStyle(item.consignee) + ' padding:1px 3px; border-radius:2px; font-size:7px; font-weight:bold;">' + item.id + '</span>' : '<i style="color:gray; font-size:7px;">Libre</i>') + '</div></div>';
+      }).join('');
+    }
+
+    function renderPlatformsMap() {
+      var container = document.getElementById('mapPlatformsContainer');
+      container.innerHTML = platformsP.map(function(plat) {
+        var items = pallets.filter(function(p) { return p.status === 'PLATAFORMA' && p.platName === plat && passesFilter(p); });
+        return '<div style="background: var(--card-bg); border: 1px solid rgba(56,189,248,0.3); border-radius: 6px; padding: 4px; font-size: 9px; display:flex; flex-direction:column; justify-content:space-between; min-height:40px;"><div style="display: flex; justify-content: space-between;"><b style="color:#38bdf8;">' + plat + '</b>' + (isAdminMode ? '<button onclick="deletePlatform(\'' + plat + '\')" style="color:#f43f5e; background:none; border:none; cursor:pointer;">✕</button>' : '') + '</div><div style="display:flex; flex-wrap:wrap; gap:2px;">' + (items.map(function(p) { return '<span onclick="openPalletModal(\'' + p.id + '\')" class="pallet-card" style="' + getConsigneeStyle(p.consignee) + ' padding:1px 3px; border-radius:2px; font-size:7px; font-weight:bold;">' + p.id + '</span>'; }).join('') || '<i style="color:gray; font-size:7px;">Libre</i>') + '</div></div>';
+      }).join('');
+    }
+
+    function renderDocks() {
+      renderDockSection('Boca Courier');
+      renderDockSection('Rampa 4');
+    }
+
+    function renderDockSection(bocaName) {
+      var camiones = predioCamionesList[bocaName];
+      var containerTitle = bocaName === 'Boca Courier' ? 'titleBocaCourier' : 'titleRampa4';
+      var containerCamiones = bocaName === 'Boca Courier' ? 'containerCamionesBocaCourier' : 'containerCamionesRampa4';
+      var containerPallets = bocaName === 'Boca Courier' ? 'dockCourier' : 'dockRampa';
+
+      document.getElementById(containerTitle).innerText = bocaName + (camiones.length > 0 ? ' [' + camiones.length + ' Camión(es)]' : ' [Sin Camión]');
+
+      var htmlCamiones = '';
+      camiones.forEach(function(c, cIdx) {
+        var tareasPendientesCamion = tasks.filter(function(t) { return t.type === 'TRUCK' && t.tractor === c.tractor; });
+        var totalGuiasCamion = c.guiasAsignadas.length;
+        var guiasCargadas = totalGuiasCamion - tareasPendientesCamion.length;
+        var estaCompleto = (totalGuiasCamion > 0 && guiasCargadas >= totalGuiasCamion);
+
+        var boxBg = estaCompleto ? 'rgba(5, 150, 105, 0.25)' : 'var(--panel-bg)';
+        var borderColor = estaCompleto ? '#34d399' : 'rgba(244,63,94,0.3)';
+        var statusBadge = estaCompleto 
+          ? '<span style="background:#059669; color:white; padding:1px 6px; border-radius:4px; font-weight:bold; font-size:9px;">✅ Carga Completa - Listo</span>'
+          : '<span style="background:#d97706; color:white; padding:1px 6px; border-radius:4px; font-weight:bold; font-size:9px;">⏳ Esperando Carga (' + guiasCargadas + '/' + totalGuiasCamion + ')</span>';
+
+        htmlCamiones += '<div style="background:' + boxBg + '; border:1px solid ' + borderColor + '; border-radius:6px; padding:6px; font-size:10px; display:flex; flex-direction:column; gap:4px;">' +
+          '<div style="display:flex; justify-content:space-between; align-items:center;"><b>Tractor: ' + c.tractor + '</b> ' + statusBadge + '</div>' +
+          '<div style="color:var(--text-muted);">Semi: ' + c.semi + ' | Transp: ' + c.empresa + '</div>' +
+          '<div>Guías asignadas: <b>' + c.guiasAsignadas.join(', ') + '</b></div>' +
+          '<button onclick="despacharCamionEspecifico(\'' + bocaName + '\', ' + cIdx + ')" class="btn ' + (estaCompleto ? 'btn-emerald' : 'btn-rose') + '" style="padding:2px 6px; font-size:9px; width:100%; justify-content:center;">🚛 Despachar Camión</button>' +
+        '</div>';
+      });
+
+      document.getElementById(containerCamiones).innerHTML = htmlCamiones || '<i style="font-size:9px; color:gray;">Sin camiones en predio para esta boca.</i>';
+
+      var statusKey = bocaName === 'Boca Courier' ? 'DESPACHADO_COURIER' : 'DESPACHADO_RAMPA';
+      document.getElementById(containerPallets).innerHTML = pallets.filter(function(p) { return p.status === statusKey && passesFilter(p); }).map(function(p) {
+        return '<span onclick="openPalletModal(\'' + p.id + '\')" class="pallet-card" style="background:#e11d48; color:white; font-size:9px; padding:2px 4px; border-radius:4px; font-weight:bold;">' + p.id + '</span>';
+      }).join('') || '<span style="font-size:8px; color:gray; font-style:italic;">En espera de vinculación...</span>';
+    }
+
+    function renderConsigneeTapeGuide() {
+      var container = document.getElementById('consigneeTapeGuide');
+      container.innerHTML = Object.keys(CON_TAPES).map(function(c) {
+        var t = CON_TAPES[c];
+        var count = pallets.filter(function(p) { return p.consignee === c && p.status !== 'FINALIZADO'; }).length;
+        var gradientSpan = 'background: linear-gradient(90deg, ' + t.tape + ' 50%, ' + (t.tape2 || t.tape) + ' 50%);';
+        return '<div style="background: var(--card-bg); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--panel-border); display: flex; align-items: center; justify-content: space-between; font-size: 11px;"><span style="font-weight: bold; display: flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 50%; ' + gradientSpan + ' display:inline-block; border: 1px solid rgba(255,255,255,0.3);"></span> ' + c + '</span><span style="font-size: 10px; color: var(--text-muted); font-family: monospace;">' + t.text + ' • <b>' + count + ' pls</b></span><div style="display:flex; gap:4px;"><button onclick="openEditConsigneeModal(\'' + c + '\')" style="color:#60a5fa; background:none; border:none; cursor:pointer; font-size:11px;" title="Editar Consignatario">✏️</button>' + (isAdminMode ? '<button onclick="deleteConsignee(\'' + c + '\')" style="color:#f43f5e; background:none; border:none; cursor:pointer; font-size:10px;" title="Eliminar">✕</button>' : '') + '</div></div>';
+      }).join('');
+    }
+
+    function renderTasks() {
+      var intList = document.getElementById('internalTaskList');
+      var trkList = document.getElementById('truckTaskList');
+
+      intList.innerHTML = tasks.filter(function(t) { return t.type === 'INTERNAL'; }).map(function(t) {
+        return '<div style="background: var(--panel-bg); border: 1px solid var(--panel-border); padding: 8px; border-radius: 8px; font-size: 11px;"><b>' + t.palletId + ' (' + t.consignee + ')</b><br>📄 Guía: <b>' + (t.hawb || 'N/D') + '</b> | 📦 Bultos: <b>' + t.bultos + '</b> | 📐 Pallets: <b>' + (t.cantPallets || 1) + '</b><br><span style="color:var(--text-muted);">Movimiento: ' + t.from + ' ➔ ' + t.to + '</span><button onclick="requestTaskConfirm(' + t.id + ', \'¿Confirmar traslado para ' + t.palletId + '?\')" class="btn btn-emerald" style="width:100%; margin-top:6px; font-size:10px; justify-content:center;">✅ Completar Traslado</button></div>';
+      }).join('') || '<p style="font-size:11px; color:gray; padding:8px;">Sin traslados internos pendientes.</p>';
+
+      trkList.innerHTML = tasks.filter(function(t) { return t.type === 'TRUCK'; }).map(function(t) {
+        return '<div style="background: var(--panel-bg); border: 1px solid var(--panel-border); padding: 8px; border-radius: 8px; font-size: 11px;"><b>' + t.palletId + ' (' + t.consignee + ')</b><br>📄 Guía: <b>' + (t.hawb || 'N/D') + '</b> | 📦 Bultos: <b>' + t.bultos + '</b> | 📐 Pallets: <b>' + (t.cantPallets || 1) + '</b><br><span style="color:var(--text-muted);">Camión [' + t.tractor + '] ➔ ' + t.to + '</span><button onclick="requestTaskConfirm(' + t.id + ', \'¿Confirmar carga para ' + t.palletId + '?\')" class="btn btn-emerald" style="width:100%; margin-top:6px; font-size:10px; justify-content:center;">✅ Confirmar Carga en Camión</button></div>';
+      }).join('') || '<p style="font-size:11px; color:gray; padding:8px;">Sin tareas de camión pendientes.</p>';
+    }
+
+    function openPalletModal(id) {
+      selectedPallet = pallets.find(function(p) { return p.id === id; });
+      if (!selectedPallet) return;
+
+      var tape = CON_TAPES[selectedPallet.consignee] || { tape: '#3b82f6', text: 'Estándar' };
+      document.getElementById('modalPalletTitle').innerText = 'Detalle Pallet: ' + selectedPallet.id;
+      document.getElementById('modalConsignee').innerHTML = '<span style="width:8px; height:8px; border-radius:50%; background:' + tape.tape + '; display:inline-block; margin-right:4px;"></span>' + selectedPallet.consignee;
+      document.getElementById('modalHawbBultos').innerText = selectedPallet.hawb + ' (' + selectedPallet.bultos + ' bultos | ' + (selectedPallet.cantPallets || 1) + ' pls)';
+      document.getElementById('modalEmbalaje').innerText = selectedPallet.embalaje || 'Estándar';
+
+      var photoContainer = document.getElementById('modalPhotoContainer');
+      var imgPreview = document.getElementById('modalImgPreview');
+      if (selectedPallet.foto) { imgPreview.src = selectedPallet.foto; photoContainer.classList.remove('hidden'); }
+      else { photoContainer.classList.add('hidden'); }
+
+      var loc = selectedPallet.status;
+      if (selectedPallet.status === 'VUELO') loc = 'Galpón Vuelo (' + selectedPallet.ubicacion + ')';
+      if (selectedPallet.status === 'VERIFICANDO') loc = 'Box E-Commerce (' + selectedPallet.boxName + ')';
+      if (selectedPallet.status === 'JAULA') loc = 'Jaula Aduana (' + selectedPallet.cageName + ')';
+      if (selectedPallet.status === 'PLATAFORMA') loc = 'Plataforma ' + selectedPallet.platName;
+      document.getElementById('modalLocation').innerText = loc;
+
+      var btnHtml = '<button onclick="openSelectPositionModal(\'VERIFICANDO\')" class="btn btn-blue" style="justify-content: center;">🗂️ Mover a Box</button><button onclick="openSelectPositionModal(\'JAULA\')" class="btn btn-emerald" style="justify-content: center;">🛡️ Mover a Jaula</button><button onclick="openSelectPositionModal(\'PLATAFORMA\')" class="btn btn-amber" style="justify-content: center;">🅿️ Mover a Plataforma P</button>';
+
+      if (isAdminMode) {
+        btnHtml += '<button onclick="initiateTruckAssignment(\'DESPACHADO_COURIER\')" class="btn btn-rose" style="justify-content: center;">🚛 Boca Courier</button><button onclick="initiateTruckAssignment(\'DESPACHADO_RAMPA\')" class="btn btn-rose" style="justify-content: center;">🚛 Rampa 4</button>';
+      }
+
+      document.getElementById('modalRelocateButtons').innerHTML = btnHtml;
+      document.getElementById('palletModal').classList.remove('hidden');
+    }
+
+    function openSelectPositionModal(targetCat) {
+      pendingCategoryTarget = targetCat;
+      var titleText = '';
+      var list = [];
+
+      if (targetCat === 'VERIFICANDO') {
+        titleText = 'Seleccionar Box Destino (E-Commerce)';
+        list = boxesSubzones;
+      } else if (targetCat === 'JAULA') {
+        titleText = 'Seleccionar Jaula Destino (Aduana)';
+        list = cageSubzones;
+      } else if (targetCat === 'PLATAFORMA') {
+        titleText = 'Seleccionar Plataforma Destino';
+        list = platformsP;
+      }
+
+      document.getElementById('selectPositionModalTitle').innerText = titleText;
+      var sel = document.getElementById('selectSubzoneTarget');
+      sel.innerHTML = list.map(function(item) { return '<option value="' + item + '">' + item + '</option>'; }).join('');
+
+      document.getElementById('selectPositionModal').classList.remove('hidden');
+    }
+
+    function closeSelectPositionModal() {
+      document.getElementById('selectPositionModal').classList.add('hidden');
+    }
+
+    function confirmPositionSelection() {
+      var targetSubzone = document.getElementById('selectSubzoneTarget').value;
+      closeSelectPositionModal();
+      confirmRelocate(pendingCategoryTarget, targetSubzone);
+    }
+
+    function closePalletModal() { document.getElementById('palletModal').classList.add('hidden'); selectedPallet = null; }
+
+    function initiateTruckAssignment(newStatus) {
+      pendingRelocateStatus = newStatus;
+      var bocaName = newStatus === 'DESPACHADO_COURIER' ? 'Boca Courier' : 'Rampa 4';
+      var camiones = predioCamionesList[bocaName];
+
+      if (!camiones || camiones.length === 0) {
+        alert('⚠️ No hay ningún camión registrado en ' + bocaName + '. Registre el ingreso en predio previamente.');
+        return;
+      }
+
+      currentSelectedPalletForTruck = selectedPallet;
+      closePalletModal();
+
+      var select = document.getElementById('selectCamionDisponibles');
+      select.innerHTML = camiones.map(function(c, idx) {
+        return '<option value="' + idx + '">Tractor: ' + c.tractor + ' | Semi: ' + c.semi + ' (Guías: ' + c.guiasAsignadas.join(', ') + ')</option>';
+      }).join('');
+
+      select.onchange = actualizarValidacionGuia;
+      actualizarValidacionGuia();
+
+      document.getElementById('selectCamionTitle').innerText = 'Asignar Camión en ' + bocaName;
+      document.getElementById('selectCamionModal').classList.remove('hidden');
+    }
+
+    function actualizarValidacionGuia() {
+      var select = document.getElementById('selectCamionDisponibles');
+      var idx = parseInt(select.value, 10);
+      var bocaName = pendingRelocateStatus === 'DESPACHADO_COURIER' ? 'Boca Courier' : 'Rampa 4';
+      var camionSeleccionado = predioCamionesList[bocaName][idx];
+      var infoDiv = document.getElementById('validacionGuiaInfo');
+
+      if (!camionSeleccionado || !currentSelectedPalletForTruck) return;
+
+      var pertenece = camionSeleccionado.guiasAsignadas.indexOf(currentSelectedPalletForTruck.id) !== -1;
+      if (pertenece) {
+        infoDiv.innerHTML = '<span style="color: #34d399; font-weight: bold;">✓ ¡Válido! El pallet ' + currentSelectedPalletForTruck.id + ' está incluido en las guías de este camión.</span>';
+      } else {
+        infoDiv.innerHTML = '<span style="color: #fbbf24; font-weight: bold;">⚠️ Advertencia: El pallet ' + currentSelectedPalletForTruck.id + ' no figura en la lista original de este camión.</span>';
+      }
+    }
+
+    function closeSelectCamionModal() { document.getElementById('selectCamionModal').classList.add('hidden'); currentSelectedPalletForTruck = null; }
+
+    function confirmAsignarPalletCamion() {
+      var select = document.getElementById('selectCamionDisponibles');
+      var idxStr = select.value;
+      var bocaName = pendingRelocateStatus === 'DESPACHADO_COURIER' ? 'Boca Courier' : 'Rampa 4';
+      var camionesEnBoca = predioCamionesList[bocaName];
+
+      if (!currentSelectedPalletForTruck) return;
+
+      var idx = parseInt(idxStr, 10);
+      var camionSeleccionado = camionesEnBoca[idx];
+
+      tasks.push({
+        id: tasks.length + 1,
+        palletId: currentSelectedPalletForTruck.id,
+        hawb: currentSelectedPalletForTruck.hawb,
+        bultos: currentSelectedPalletForTruck.bultos,
+        cantPallets: currentSelectedPalletForTruck.cantPallets || 1,
+        consignee: currentSelectedPalletForTruck.consignee,
+        type: 'TRUCK',
+        from: currentSelectedPalletForTruck.status,
+        to: bocaName + ' [' + camionSeleccionado.tractor + ']',
+        targetStatus: pendingRelocateStatus,
+        tractor: camionSeleccionado.tractor,
+        semi: camionSeleccionado.semi,
+        empresa: camionSeleccionado.empresa
+      });
+
+      closeSelectCamionModal();
+      renderAll();
+      alert('¡Orden de carga agregada a la lista de tareas!');
+    }
+
+    function requestTaskConfirm(taskId, msg) {
+      document.getElementById('taskConfirmMessage').innerText = msg;
+      document.getElementById('btnExecuteTask').onclick = function() { executeTask(taskId); };
+      document.getElementById('taskConfirmModal').classList.remove('hidden');
+    }
+    function closeTaskConfirmModal() { document.getElementById('taskConfirmModal').classList.add('hidden'); }
+
+    function executeTask(taskId) {
+      var idx = tasks.findIndex(function(t) { return t.id === taskId; });
+      if (idx !== -1) {
+        var t = tasks[idx];
+        var p = pallets.find(function(pal) { return pal.id === t.palletId; });
+        if (p) {
+          p.status = t.targetStatus;
+          if (t.targetBoxName) p.boxName = t.targetBoxName;
+          if (t.targetCageName) p.cageName = t.targetCageName;
+          if (t.targetPlat) p.platName = t.targetPlat;
+          if (t.tractor) p.tractor = t.tractor;
+        }
+        tasks.splice(idx, 1);
+      }
+      closeTaskConfirmModal();
+      renderAll();
+    }
+
+    function confirmRelocate(newStatus, targetSubzone) {
+      if (!selectedPallet) return;
+      var currentLoc = selectedPallet.ubicacion || selectedPallet.status;
+
+      if (newStatus === 'VERIFICANDO') {
+        tasks.push({
+          id: tasks.length + 1,
+          palletId: selectedPallet.id,
+          hawb: selectedPallet.hawb,
+          bultos: selectedPallet.bultos,
+          cantPallets: selectedPallet.cantPallets || 1,
+          consignee: selectedPallet.consignee,
+          type: 'INTERNAL',
+          from: currentLoc,
+          to: targetSubzone,
+          targetStatus: 'VERIFICANDO',
+          targetBoxName: targetSubzone
+        });
+      } else if (newStatus === 'JAULA') {
+        tasks.push({
+          id: tasks.length + 1,
+          palletId: selectedPallet.id,
+          hawb: selectedPallet.hawb,
+          bultos: selectedPallet.bultos,
+          cantPallets: selectedPallet.cantPallets || 1,
+          consignee: selectedPallet.consignee,
+          type: 'INTERNAL',
+          from: currentLoc,
+          to: targetSubzone,
+          targetStatus: 'JAULA',
+          targetCageName: targetSubzone
+        });
+      } else if (newStatus === 'PLATAFORMA') {
+        tasks.push({
+          id: tasks.length + 1,
+          palletId: selectedPallet.id,
+          hawb: selectedPallet.hawb,
+          bultos: selectedPallet.bultos,
+          cantPallets: selectedPallet.cantPallets || 1,
+          consignee: selectedPallet.consignee,
+          type: 'INTERNAL',
+          from: currentLoc,
+          to: targetSubzone,
+          targetStatus: 'PLATAFORMA',
+          targetPlat: targetSubzone
+        });
+      }
+
+      closePalletModal();
+      renderAll();
+      alert('✓ Orden de traslado interno generada hacia ' + targetSubzone + '.');
+    }
+
+    function despacharCamionEspecifico(bocaName, index) {
+      var camiones = predioCamionesList[bocaName];
+      var camion = camiones[index];
+      if (!camion) return;
+
+      var tareasPendientes = tasks.filter(function(t) { return t.type === 'TRUCK' && t.tractor === camion.tractor; });
+      if (tareasPendientes.length > 0) {
+        var continuar = confirm('⚠️ Este camión todavía tiene ' + tareasPendientes.length + ' guía(s) pendiente(s) de carga en el Cuadro 2. ¿Desea despacharlo de todas formas?');
+        if (!continuar) return;
+      }
+
+      historialCamionesCargados.push(camion);
+      camiones.splice(index, 1);
+
+      pallets = pallets.map(function(p) {
+        if (camion.guiasAsignadas.indexOf(p.id) !== -1) {
+          p.status = 'FINALIZADO';
+        }
+        return p;
+      });
+
+      renderAll();
+      alert('✓ Camión [' + camion.tractor + '] despachado con éxito de ' + bocaName + '.');
+    }
+
+    function exportToExcel() {
+      var csv = 'ID Pallet,Guia HAWB,Consignatario,Bultos,Cant Pallets,Estado\n';
+      pallets.forEach(function(p) {
+        csv += '"' + p.id + '","' + p.hawb + '","' + p.consignee + '",' + p.bultos + ',' + (p.cantPallets || 1) + ',"' + p.status + '"\n';
+      });
+
+      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'Ezeiza_Reporte_Operativo.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function openAddZoneModal(cat) {
+      activeZoneCat = cat;
+      document.getElementById('addZoneModal').classList.remove('hidden');
+    }
+    function closeAddZoneModal() { document.getElementById('addZoneModal').classList.add('hidden'); }
+    function handleCreateZone(e) {
+      e.preventDefault();
+      var name = document.getElementById('inputNewZoneName').value.trim();
+      if (name) {
+        if (activeZoneCat === 'VUELO') galponSubzones.push(name);
+        if (activeZoneCat === 'BOXES') boxesSubzones.push(name);
+        if (activeZoneCat === 'CAGE') cageSubzones.push(name);
+        if (activeZoneCat === 'PLATFORM') platformsP.push(name);
+        closeAddZoneModal();
+        document.getElementById('inputNewZoneName').value = '';
+        renderAll();
+      }
+    }
+    function deleteSubzone(name) { galponSubzones = galponSubzones.filter(function(z) { return z !== name; }); renderAll(); }
+    function deleteBoxSubzone(name) { boxesSubzones = boxesSubzones.filter(function(z) { return z !== name; }); renderAll(); }
+    function deleteCageSubzone(name) { cageSubzones = cageSubzones.filter(function(z) { return z !== name; }); renderAll(); }
+    function deletePlatform(p) { platformsP = platformsP.filter(function(item) { return item !== p; }); renderAll(); }
+
+    function openAddConsigneeModal() {
+      document.getElementById('consigneeModalTitle').innerText = '🎨 Agregar Consignatario';
+      document.getElementById('editingConsigneeOriginalName').value = '';
+      document.getElementById('inputNewConsignee').value = '';
+      document.getElementById('inputNewTapeText').value = '';
+      document.getElementById('inputNewTapeColor').value = '#06b6d4';
+      document.getElementById('inputNewTapeColor2').value = '#f59e0b';
+      document.getElementById('consigneeModal').classList.remove('hidden');
+    }
+
+    function openEditConsigneeModal(name) {
+      var item = CON_TAPES[name];
+      if (!item) return;
+      document.getElementById('consigneeModalTitle').innerText = '✏️ Editar Consignatario: ' + name;
+      document.getElementById('editingConsigneeOriginalName').value = name;
+      document.getElementById('inputNewConsignee').value = name;
+      document.getElementById('inputNewTapeText').value = item.text || '';
+      document.getElementById('inputNewTapeColor').value = item.tape || '#06b6d4';
+      document.getElementById('inputNewTapeColor2').value = item.tape2 || item.tape || '#f59e0b';
+      document.getElementById('consigneeModal').classList.remove('hidden');
+    }
+
+    function closeConsigneeModal() { document.getElementById('consigneeModal').classList.add('hidden'); }
+    
+    function handleSaveConsignee(e) {
+      e.preventDefault();
+      var origName = document.getElementById('editingConsigneeOriginalName').value.trim();
+      var name = document.getElementById('inputNewConsignee').value.trim();
+      var text = document.getElementById('inputNewTapeText').value.trim();
+      var color1 = document.getElementById('inputNewTapeColor').value;
+      var color2 = document.getElementById('inputNewTapeColor2').value;
+
+      if (origName && origName !== name) {
+        delete CON_TAPES[origName];
+        pallets.forEach(function(p) {
+          if (p.consignee === origName) p.consignee = name;
+        });
+      }
+
+      if (name) {
+        CON_TAPES[name] = { tape: color1, tape2: color2, text: text };
+        closeConsigneeModal();
+        renderAll();
+      }
+    }
+    function deleteConsignee(name) { delete CON_TAPES[name]; renderAll(); }
+
+    function openIngresoGuiasModal() { document.getElementById('ingresoGuiasModal').classList.remove('hidden'); }
+    function closeIngresoGuiasModal() { document.getElementById('ingresoGuiasModal').classList.add('hidden'); }
+    function handleRegistrarGuia(e) {
+      e.preventDefault();
+      pallets.push({
+        id: document.getElementById('inputPalletId').value.trim(),
+        hawb: document.getElementById('inputHawb').value.trim(),
+        consignee: document.getElementById('selectConsignatario').value,
+        bultos: parseInt(document.getElementById('inputBultos').value, 10),
+        cantPallets: parseInt(document.getElementById('inputCantPallets').value, 10) || 1,
+        embalaje: document.getElementById('inputEmbalaje').value.trim(),
+        foto: document.getElementById('inputFoto').value.trim(),
+        status: 'VUELO',
+        ubicacion: document.getElementById('selectUbicacionInicial').value
+      });
+      closeIngresoGuiasModal();
+      document.getElementById('guiasForm').reset();
+      renderAll();
+    }
+  </script>
+</body>
+</html>
